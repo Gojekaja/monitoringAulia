@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>List Pemantauan - Sistem Monitoring Produk</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Pemilih Rentang Tanggal Kalender -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <!-- Proteksi Sesi Login Awal -->
+    <script>
+      const activeRole = localStorage.getItem("loggedInRole");
+      if (!activeRole) {
+        window.location.href = "login.html";
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Batang Navigasi Utama Aplikasi -->
+    <header class="navbar">
+      <div class="logo">
+        <img src="logo.png" alt="Logo" style="height: 48px" />
+      </div>
+      <nav class="nav-links">
+        <a href="dashboard.html" id="nav-dashboard">Dashboard</a>
+        <a href="list.html" id="nav-list" class="active">List</a>
+        <a href="#" id="nav-logout" style="color: #ef4444">Log out</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <!-- Panel Penyaringan Data Atas -->
+      <div class="top-controls" id="topControls" style="display: flex">
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Cari klien atau produk..."
+          />
+          <i class="fas fa-search"></i>
+        </div>
+        <div class="filters">
+          <select id="statusFilter">
+            <option value="Semua">Semua Status</option>
+            <option value="Menunggu">Menunggu</option>
+            <option value="Pengerjaan RnD">Pengerjaan RnD</option>
+            <option value="Pengerjaan Registrasi">Pengerjaan Registrasi</option>
+            <option value="Selesai">Selesai</option>
+            <option value="Gagal">Gagal/Batal</option>
+          </select>
+          <select id="sortFilter">
+            <option value="created_desc">Data Dibuat (Terbaru)</option>
+            <option value="created_asc">Data Dibuat (Terlama)</option>
+            <option value="updated_desc">Status Update (Terbaru)</option>
+            <option value="updated_asc">Status Update (Terlama)</option>
+          </select>
+          <div class="date-picker">
+            <i
+              class="far fa-calendar-alt"
+              style="color: var(--color-text-light)"
+            ></i>
+            <input
+              type="text"
+              id="dateRangePicker"
+              placeholder="Pilih Tanggal..."
+              style="
+                border: none;
+                outline: none;
+                background: transparent;
+                font-family: inherit;
+                width: 170px;
+                cursor: pointer;
+                color: var(--color-text);
+              "
+            />
+            <i
+              class="fas fa-times-circle"
+              id="clearDateBtn"
+              style="cursor: pointer; display: none; color: #ef4444"
+              title="Reset Tanggal"
+            ></i>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="content-grid"
+        id="contentGrid"
+        style="display: flex; flex-direction: column"
+      >
+        <!-- Layout Baris Utama Tabel -->
+        <div
+          id="topRowGrid"
+          style="
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+            align-items: stretch;
+          "
+        >
+          <!-- Wadah Tabel Pemantauan Produk -->
+          <div
+            class="table-container"
+            id="tableContainer"
+            style="
+              min-width: 0;
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+            "
+          >
+            <div class="table-header-title" id="tableHeaderTitle">
+              Data Monitoring Produk
+            </div>
+            <div
+              id="tableWrapper"
+              style="overflow-y: auto; flex: 1; overflow-x: auto"
+            >
+              <table id="productTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px">No.</th>
+                    <th>Nama Klien</th>
+                    <th>Tanggal</th>
+                    <th>Nama Produk</th>
+                    <th>Dokumen</th>
+                    <th>Status Keseluruhan</th>
+                    <th>Fase RnD</th>
+                    <th>Fase Registrasi</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody">
+                  <!-- Baris Data Injeksi Dinamis -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal Ubah Status Produk -->
+    <div id="updateModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Update Status Produk</h2>
+        <form id="updateForm">
+          <input type="hidden" id="updateId" />
+          <div class="form-group">
+            <label>Fase RnD (F1/F2/F3)</label>
+            <select id="rndStatus">
+              <option value="Menunggu">Menunggu</option>
+              <option value="F1">F1 (Formula 1)</option>
+              <option value="F2">F2 (Formula 2)</option>
+              <option value="F3">F3 (Formula 3)</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fase Registrasi</label>
+            <select id="regStatus">
+              <option value="Menunggu">Menunggu</option>
+              <option value="Merek">Daftar Merek</option>
+              <option value="MoU">Pembuatan MoU</option>
+              <option value="Draft">Persiapan Draft</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-submit">Simpan Perubahan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Pratinjau Detail Gambar -->
+    <div id="docModal" class="modal" style="z-index: 200">
+      <div
+        class="modal-content"
+        style="
+          margin: 5vh auto;
+          width: 90%;
+          max-width: 1000px;
+          height: 90vh;
+          display: flex;
+          flex-direction: column;
+          padding: 20px;
+          background: white;
+          border-radius: 12px;
+          position: relative;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 15px;
+          "
+        >
+          <h3 style="margin: 0; font-size: 18px; color: #111827">
+            Preview Dokumen
+          </h3>
+          <div style="display: flex; gap: 15px; align-items: center">
+            <button
+              id="zoomOutBtn"
+              style="
+                background: none;
+                border: none;
+                color: #4b5563;
+                font-size: 20px;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Zoom Out"
+            >
+              <i class="fas fa-search-minus"></i>
+            </button>
+            <button
+              id="zoomInBtn"
+              style="
+                background: none;
+                border: none;
+                color: #4b5563;
+                font-size: 20px;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Zoom In"
+            >
+              <i class="fas fa-search-plus"></i>
+            </button>
+            <div
+              style="
+                width: 1px;
+                height: 24px;
+                background-color: #e5e7eb;
+                margin: 0 5px;
+              "
+            ></div>
+            <a
+              id="downloadDocBtn"
+              href="#"
+              download="Dokumen.png"
+              style="
+                color: #4b5563;
+                font-size: 20px;
+                text-decoration: none;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Download Dokumen"
+            >
+              <i class="fas fa-download"></i>
+            </a>
+            <span
+              class="close-doc"
+              style="
+                color: #ef4444;
+                font-size: 28px;
+                cursor: pointer;
+                line-height: 20px;
+                transition: color 0.2s;
+                margin-left: 10px;
+              "
+              title="Tutup"
+              >&times;</span
+            >
+          </div>
+        </div>
+
+        <div
+          style="
+            flex: 1;
+            overflow: auto;
+            background: #f3f4f6;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+          "
+        >
+          <img
+            id="fullSizeImage"
+            style="
+              width: 100%;
+              height: auto;
+              transition: width 0.2s ease;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            "
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Unggah Berkas Tersembunyi -->
+    <input
+      type="file"
+      id="hiddenBriefUpload"
+      accept="image/png, image/jpeg"
+      style="display: none"
+    />
+
+    <!-- Skrip Penghubung Dan Pengontrol -->
+    <script src="js/db.js"></script>
+    <script src="js/list.js"></script>
+  </body>
+</html>

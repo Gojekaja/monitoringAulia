@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - Sistem Monitoring Produk</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Pustaka Grafik Chartjs Laporan -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Proteksi Sesi Login Awal -->
+    <script>
+      const activeRole = localStorage.getItem("loggedInRole");
+      if (!activeRole) {
+        window.location.href = "login.html";
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Batang Navigasi Utama Aplikasi -->
+    <header class="navbar">
+      <div class="logo">
+        <img src="logo.png" alt="Logo" style="height: 48px" />
+      </div>
+      <nav class="nav-links">
+        <a href="dashboard.html" id="nav-dashboard" class="active">Dashboard</a>
+        <a href="list.html" id="nav-list">List</a>
+        <a href="#" id="nav-logout" style="color: #ef4444">Log out</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <div
+        class="content-grid"
+        id="contentGrid"
+        style="display: flex; flex-direction: column"
+      >
+        <!-- Layout Utama Grid Dashboard -->
+        <div
+          id="topRowGrid"
+          style="
+            display: grid;
+            grid-template-columns: 2.5fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+            align-items: stretch;
+          "
+        >
+          <!-- Wadah Tabel Pemantauan Produk -->
+          <div
+            class="table-container"
+            id="tableContainer"
+            style="
+              min-width: 0;
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+            "
+          >
+            <div class="table-header-title" id="tableHeaderTitle">
+              Data Produk Terbaru
+            </div>
+            <div
+              id="tableWrapper"
+              style="
+                overflow-y: auto;
+                flex: 1;
+                min-height: 380px;
+                overflow-x: auto;
+              "
+            >
+              <table id="productTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px">No.</th>
+                    <th>Klien</th>
+                    <th>Tanggal</th>
+                    <th>Produk</th>
+                    <th>Dokumen</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody">
+                  <!-- Baris Data Injeksi Dinamis -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Kolom Sisi Grafik Form -->
+          <div
+            class="sidebar"
+            id="sidebar"
+            style="
+              min-width: 0;
+              display: flex;
+              flex-direction: column;
+              gap: 30px;
+              height: 100%;
+            "
+          >
+            <!-- Kartu Grafik Laporan Hasil -->
+            <div
+              class="card chart-card"
+              style="
+                width: 100%;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+              "
+            >
+              <div class="card-title">Laporan Hasil</div>
+              <div
+                class="chart-container"
+                style="height: 250px; flex-shrink: 0"
+              >
+                <canvas id="statusChart"></canvas>
+                <div class="chart-center-text">
+                  <span class="chart-label">Total Produk</span>
+                  <span class="chart-value" id="totalProducts">0</span>
+                </div>
+              </div>
+              <div
+                class="chart-legend"
+                style="margin-top: auto; flex-shrink: 0"
+              >
+                <div class="legend-item">
+                  <span class="dot" style="background-color: #f59e0b"></span>
+                  <span class="legend-text">Menunggu</span>
+                  <span class="legend-percent">0%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="dot" style="background-color: #3b82f6"></span>
+                  <span class="legend-text">Pengerjaan RnD</span>
+                  <span class="legend-percent">0%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="dot" style="background-color: #8b5cf6"></span>
+                  <span class="legend-text">Pengerjaan Reg.</span>
+                  <span class="legend-percent">0%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="dot dot-completed"></span>
+                  <span class="legend-text">Selesai</span>
+                  <span class="legend-percent">0%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="dot dot-failed"></span>
+                  <span class="legend-text">Gagal/Batal</span>
+                  <span class="legend-percent">0%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kartu Formulir Input Baru -->
+            <div
+              id="bottomRowContainer"
+              style="display: none; width: 100%; flex-shrink: 0"
+            >
+              <div class="card form-card" id="inputCard" style="width: 100%">
+                <div class="card-title form-title">Input Data</div>
+                <form
+                  id="productForm"
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                    padding: 20px;
+                  "
+                >
+                  <div class="form-group" style="margin-bottom: 0">
+                    <label>Nama Klien</label>
+                    <input
+                      type="text"
+                      id="clientName"
+                      placeholder="Masukkan nama.."
+                      required
+                    />
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0">
+                    <label>Nama Produk</label>
+                    <input
+                      type="text"
+                      id="productName"
+                      placeholder="Masukkan nama produk.."
+                      required
+                    />
+                  </div>
+                  <div
+                    class="form-group"
+                    style="
+                      margin-bottom: 0;
+                      display: flex;
+                      flex-direction: column;
+                      min-height: 0;
+                    "
+                  >
+                    <label>Dokumen Briefing</label>
+                    <div
+                      class="file-upload-wrapper"
+                      style="
+                        position: relative;
+                        height: 120px;
+                        border: 2px dashed #ccc;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        background: #fafafa;
+                      "
+                    >
+                      <div
+                        id="uploadPrompt"
+                        style="
+                          display: flex;
+                          height: 100%;
+                          align-items: center;
+                          justify-content: center;
+                          background: #cffafe;
+                          transition: background 0.3s;
+                        "
+                      >
+                        <label
+                          for="documentUpload"
+                          style="
+                            cursor: pointer;
+                            color: #166534;
+                            font-weight: 600;
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                          "
+                        >
+                          Upload dokumen
+                        </label>
+                        <input
+                          type="file"
+                          id="documentUpload"
+                          accept="image/png, image/jpeg"
+                          hidden
+                        />
+                      </div>
+                      <div
+                        id="previewContainer"
+                        style="
+                          display: none;
+                          position: absolute;
+                          top: 0;
+                          left: 0;
+                          height: 100%;
+                          width: 100%;
+                          overflow: auto;
+                        "
+                      >
+                        <img
+                          id="previewImage"
+                          style="
+                            display: block;
+                            width: 100%;
+                            cursor: zoom-in;
+                            transform-origin: top left;
+                          "
+                          alt="Preview"
+                        />
+                        <button
+                          type="button"
+                          id="removePreviewBtn"
+                          style="
+                            position: sticky;
+                            top: 10px;
+                            left: 85%;
+                            background: rgba(0, 0, 0, 0.6);
+                            color: white;
+                            border: none;
+                            border-radius: 50%;
+                            width: 24px;
+                            height: 24px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            z-index: 10;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 11px;
+                          "
+                        >
+                          X
+                        </button>
+                      </div>
+                    </div>
+                    <small
+                      id="previewHint"
+                      style="
+                        display: none;
+                        color: #666;
+                        margin-top: 4px;
+                        font-size: 11px;
+                      "
+                      >Klik untuk melihat detail.</small
+                    >
+                  </div>
+                  <button
+                    type="submit"
+                    class="btn-submit"
+                    style="width: 100%; margin-top: 8px"
+                  >
+                    Selesai
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal Pratinjau Detail Gambar -->
+    <div id="docModal" class="modal" style="z-index: 200">
+      <div
+        class="modal-content"
+        style="
+          margin: 5vh auto;
+          width: 90%;
+          max-width: 1000px;
+          height: 90vh;
+          display: flex;
+          flex-direction: column;
+          padding: 20px;
+          background: white;
+          border-radius: 12px;
+          position: relative;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 15px;
+          "
+        >
+          <h3 style="margin: 0; font-size: 18px; color: #111827">
+            Preview Dokumen
+          </h3>
+          <div style="display: flex; gap: 15px; align-items: center">
+            <button
+              id="zoomOutBtn"
+              style="
+                background: none;
+                border: none;
+                color: #4b5563;
+                font-size: 20px;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Zoom Out"
+            >
+              <i class="fas fa-search-minus"></i>
+            </button>
+            <button
+              id="zoomInBtn"
+              style="
+                background: none;
+                border: none;
+                color: #4b5563;
+                font-size: 20px;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Zoom In"
+            >
+              <i class="fas fa-search-plus"></i>
+            </button>
+            <div
+              style="
+                width: 1px;
+                height: 24px;
+                background-color: #e5e7eb;
+                margin: 0 5px;
+              "
+            ></div>
+            <a
+              id="downloadDocBtn"
+              href="#"
+              download="Dokumen.png"
+              style="
+                color: #4b5563;
+                font-size: 20px;
+                text-decoration: none;
+                cursor: pointer;
+                transition: color 0.2s;
+              "
+              title="Download Dokumen"
+            >
+              <i class="fas fa-download"></i>
+            </a>
+            <span
+              class="close-doc"
+              style="
+                color: #ef4444;
+                font-size: 28px;
+                cursor: pointer;
+                line-height: 20px;
+                transition: color 0.2s;
+                margin-left: 10px;
+              "
+              title="Tutup"
+              >&times;</span
+            >
+          </div>
+        </div>
+
+        <div
+          style="
+            flex: 1;
+            overflow: auto;
+            background: #f3f4f6;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+          "
+        >
+          <img
+            id="fullSizeImage"
+            style="
+              width: 100%;
+              height: auto;
+              transition: width 0.2s ease;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            "
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Skrip Penghubung Dan Pengontrol -->
+    <script src="js/db.js"></script>
+    <script src="js/dashboard.js"></script>
+  </body>
+</html>
