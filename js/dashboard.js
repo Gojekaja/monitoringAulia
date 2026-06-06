@@ -21,12 +21,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Atur Tampilan Formulir Marketing
+    // Atur Tampilan Formulir Marketing & Pengingat RnD/Registrasi
     const bottomRow = document.getElementById('bottomRowContainer');
+    const reminderRow = document.getElementById('reminderRowContainer');
+    
     if (window.loggedInRole === 'Marketing') {
         if (bottomRow) bottomRow.style.display = 'block';
+        if (reminderRow) reminderRow.style.display = 'none';
+    } else if (window.loggedInRole === 'RnD' || window.loggedInRole === 'Registrasi') {
+        if (bottomRow) bottomRow.style.display = 'none';
+        if (reminderRow) {
+            reminderRow.style.display = 'block';
+            await loadReminders();
+        }
     } else {
         if (bottomRow) bottomRow.style.display = 'none';
+        if (reminderRow) reminderRow.style.display = 'none';
     }
 
     // Tampilkan Tabel Dan Grafik
@@ -39,39 +49,56 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         tbody.innerHTML = '';
 
+        const formatDateTime = (isoStr) => {
+            if (!isoStr) return '-';
+            try {
+                const date = new Date(isoStr);
+                if (isNaN(date.getTime())) return isoStr;
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `<div style="white-space: nowrap; font-weight: 500;">${day}/${month}/${year}</div><div style="font-size: 11px; color: var(--color-text-light); margin-top: 4px;"><i class="far fa-clock" style="font-size: 10px; margin-right: 4px;"></i>${hours}:${minutes}</div>`;
+            } catch (e) {
+                return isoStr;
+            }
+        };
+
         const products = await window.db.getProducts();
 
         // Urutkan Sesuai Pembaruan Terbaru
         const sortedProducts = [...products];
         sortedProducts.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+        const clickedAlerts = JSON.parse(localStorage.getItem('clickedAlerts') || '[]');
 
         // Gambar Baris Data Tabel
         sortedProducts.forEach((p, index) => {
-            let statusDot = 'dot-progress';
-            let inlineColor = '';
-            
-            if (p.status === 'Selesai') statusDot = 'dot-completed';
-            else if (p.status === 'Gagal') statusDot = 'dot-failed';
-            else if (p.status === 'Menunggu') { statusDot = ''; inlineColor = '#f59e0b'; }
-            else if (p.status === 'Pengerjaan RnD') { statusDot = ''; inlineColor = '#3b82f6'; }
-            else if (p.status === 'Pengerjaan Registrasi') { statusDot = ''; inlineColor = '#8b5cf6'; }
-
-            const dotHtml = inlineColor 
-                ? `<span class="dot" style="background-color: ${inlineColor};"></span>` 
-                : `<span class="dot ${statusDot}"></span>`;
+            let statusClass = 'status-rnd';
+            if (p.status === 'Selesai') statusClass = 'status-selesai';
+            else if (p.status === 'Gagal') statusClass = 'status-gagal';
+            else if (p.status === 'Menunggu') statusClass = 'status-menunggu';
+            else if (p.status === 'Pengerjaan RnD') statusClass = 'status-rnd';
+            else if (p.status === 'Pengerjaan Registrasi') statusClass = 'status-registrasi';
 
             const cleanDate = p.date ? (p.date.includes('T') ? p.date.split('T')[0] : p.date) : '-';
+
+            let alertIconHtml = '';
+            if (window.loggedInRole === 'Marketing' && (p.rnd === 'Selesai' || p.reg === 'Selesai')) {
+                if (!clickedAlerts.includes(p.id)) {
+                    alertIconHtml = `
+                        <span class="animate-pulse-soft" style="color: #ef4444; margin-left: 8px;" title="Fase RnD atau Registrasi selesai!">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </span>
+                    `;
+                }
+            }
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${(index + 1).toString().padStart(2, '0')}</td>
-                <td>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(p.client)}&background=random&rounded=true&size=32" alt="avatar">
-                        ${p.client}
-                    </div>
-                </td>
-                <td>${cleanDate}</td>
+                <td>${p.client}</td>
+                <td style="white-space: nowrap;">${cleanDate}</td>
                 <td>${p.product}</td>
                 <td>
                     ${p.document 
@@ -81,13 +108,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ? `<button class="action-btn" onclick="window.viewBrief(${p.id})" style="color: #9333ea; display: block;"><i class="fas fa-file-image"></i> Final</button>`
                         : ''}
                 </td>
+                <td>${formatDateTime(p.lastUpdated)}</td>
                 <td>
-                    <div class="status-indicator">
-                        ${dotHtml}
-                        ${p.status}
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="status-indicator ${statusClass}">
+                            <span class="dot"></span>
+                            ${p.status}
+                        </div>
+                        ${alertIconHtml}
                     </div>
                 </td>
             `;
+
+            // Ketika di click pada list (khusus marketing), maka akan berpindah ke halaman list dan highlight baris klien yang di click
+            if (window.loggedInRole === 'Marketing') {
+                tr.style.cursor = 'pointer';
+                tr.addEventListener('click', (e) => {
+                    if (e.target.closest('button') || e.target.closest('a')) {
+                        return;
+                    }
+                    // Tandai alert sebagai diklik agar hilang
+                    const currentClicked = JSON.parse(localStorage.getItem('clickedAlerts') || '[]');
+                    if (!currentClicked.includes(p.id)) {
+                        currentClicked.push(p.id);
+                        localStorage.setItem('clickedAlerts', JSON.stringify(currentClicked));
+                    }
+                    window.location.href = `list.html?highlight=${p.id}`;
+                });
+            }
+
             tbody.appendChild(tr);
         });
 
@@ -156,6 +205,76 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             }
+        }
+    }
+
+    async function loadReminders() {
+        const products = await window.db.getProducts();
+        const reminderBadge = document.getElementById('reminderBadge');
+        const reminderText = document.getElementById('reminderText');
+        const reminderList = document.getElementById('reminderList');
+        if (!reminderText || !reminderList) return;
+
+        // Filter products that need attention for the logged-in role
+        let targetProducts = [];
+        if (window.loggedInRole === 'RnD') {
+            targetProducts = products.filter(p => p.status === 'Pengerjaan RnD' && p.rnd !== 'Selesai');
+        } else if (window.loggedInRole === 'Registrasi') {
+            targetProducts = products.filter(p => p.status === 'Pengerjaan Registrasi' && p.reg !== 'Selesai');
+        }
+
+        const count = targetProducts.length;
+        if (reminderBadge) reminderBadge.innerText = count;
+
+        if (count === 0) {
+            reminderText.innerHTML = `<span style="color: #059669; font-weight: 600;"><i class="fas fa-check-circle"></i> Bagus!</span> Semua tugas Anda telah selesai dikerjakan saat ini.`;
+            reminderList.innerHTML = '';
+            const cardEl = document.getElementById('reminderCard');
+            if (cardEl) {
+                cardEl.style.borderLeftColor = '#10b981';
+                const cardTitle = cardEl.querySelector('.card-title');
+                if (cardTitle) {
+                    cardTitle.style.backgroundColor = '#ecfdf5';
+                    cardTitle.style.color = '#065f46';
+                }
+            }
+            if (reminderBadge) reminderBadge.style.backgroundColor = '#10b981';
+        } else {
+            const cardEl = document.getElementById('reminderCard');
+            if (cardEl) {
+                cardEl.style.borderLeftColor = '#f59e0b';
+                const cardTitle = cardEl.querySelector('.card-title');
+                if (cardTitle) {
+                    cardTitle.style.backgroundColor = '#fffbeb';
+                    cardTitle.style.color = '#b45309';
+                }
+            }
+            if (reminderBadge) reminderBadge.style.backgroundColor = '#d97706';
+
+            reminderText.innerHTML = `<strong>Daftar Klien Butuh Tindakan:</strong>`;
+            
+            let listHtml = '';
+            targetProducts.forEach(p => {
+                const currentPhaseVal = window.loggedInRole === 'RnD' ? p.rnd : p.reg;
+                const isRnD = window.loggedInRole === 'RnD';
+                const bg = isRnD ? '#eff6ff' : '#faf5ff';
+                const border = isRnD ? '#bfdbfe' : '#e9d5ff';
+                const textColor = isRnD ? '#1e40af' : '#6b21a8';
+                const clientColor = isRnD ? '#1e3a8a' : '#581c87';
+                const badgeBg = isRnD ? '#bfdbfe' : '#e9d5ff';
+                const badgeText = isRnD ? '#1d4ed8' : '#7c3aed';
+
+                listHtml += `
+                    <div style="padding: 10px 14px; border-radius: 8px; background-color: ${bg}; border: 1px solid ${border}; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px rgba(0,0,0,0.02)';" onclick="window.location.href='list.html?highlight=${p.id}'">
+                        <div style="display: flex; flex-direction: column; gap: 3px;">
+                            <span style="font-weight: 700; color: ${textColor}; font-size: 14px;">${p.product}</span>
+                            <span style="font-size: 12px; color: ${clientColor}; font-weight: 500;"><i class="far fa-user" style="margin-right: 4px; font-size: 11px;"></i>${p.client}</span>
+                        </div>
+                        <span class="badge" style="background-color: ${badgeBg}; color: ${badgeText}; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">FASE: ${currentPhaseVal}</span>
+                    </div>
+                `;
+            });
+            reminderList.innerHTML = listHtml;
         }
     }
 

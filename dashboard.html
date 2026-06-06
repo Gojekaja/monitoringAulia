@@ -82,9 +82,10 @@
                   <tr>
                     <th style="width: 60px">No.</th>
                     <th>Klien</th>
-                    <th>Tanggal</th>
+                    <th style="min-width: 120px;">Tanggal</th>
                     <th>Produk</th>
                     <th>Dokumen</th>
+                    <th style="min-width: 150px">Terakhir Diperbarui</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -316,6 +317,27 @@
                     Selesai
                   </button>
                 </form>
+              </div>
+            </div>
+
+            <!-- Kartu Pengingat / Notifikasi Kerja -->
+            <div
+              id="reminderRowContainer"
+              style="display: none; width: 100%; flex-shrink: 0;"
+            >
+              <div class="card" id="reminderCard" style="width: 100%; border-left: 5px solid #f59e0b; transition: var(--transition-smooth);">
+                <div class="card-title" style="background-color: #fffbeb; color: #b45309; display: flex; align-items: center; justify-content: space-between;">
+                  <span><i class="fas fa-bell animate-bounce" style="margin-right: 8px;"></i> Pengingat Pekerjaan</span>
+                  <span class="badge" id="reminderBadge" style="background-color: #d97706; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">0</span>
+                </div>
+                <div style="padding: 20px;">
+                  <p id="reminderText" style="font-size: 14px; color: var(--color-text); line-height: 1.5; margin-bottom: 12px;">
+                    Memuat data pengingat...
+                  </p>
+                  <div id="reminderList" style="max-height: 150px; overflow-y: auto; font-size: 13px; color: var(--color-text-light);">
+                    <!-- Daftar klien pengingat -->
+                  </div>
+                </div>
               </div>
             </div>
           </div>

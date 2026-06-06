@@ -93,6 +93,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         tbody.innerHTML = '';
 
+        const formatDateTime = (isoStr) => {
+            if (!isoStr) return '-';
+            try {
+                const date = new Date(isoStr);
+                if (isNaN(date.getTime())) return isoStr;
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `<div style="white-space: nowrap; font-weight: 500;">${day}/${month}/${year}</div><div style="font-size: 12px; color: var(--color-text-light); margin-top: 4px;"><i class="far fa-clock" style="font-size: 11px; margin-right: 4px;"></i>${hours}:${minutes}</div>`;
+            } catch (e) {
+                return isoStr;
+            }
+        };
+
         const products = await window.db.getProducts();
 
         // Penyaringan Dan Pengurutan Data
@@ -122,20 +138,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Gambar Baris Data Tabel
         filteredProducts.forEach((p, index) => {
-            let statusDot = 'dot-progress';
-            let inlineColor = '';
-            
-            if (p.status === 'Selesai') statusDot = 'dot-completed';
-            else if (p.status === 'Gagal') statusDot = 'dot-failed';
-            else if (p.status === 'Menunggu') { statusDot = ''; inlineColor = '#f59e0b'; }
-            else if (p.status === 'Pengerjaan RnD') { statusDot = ''; inlineColor = '#3b82f6'; }
-            else if (p.status === 'Pengerjaan Registrasi') { statusDot = ''; inlineColor = '#8b5cf6'; }
-
-            const dotHtml = inlineColor 
-                ? `<span class="dot" style="background-color: ${inlineColor};"></span>` 
-                : `<span class="dot ${statusDot}"></span>`;
+            let statusClass = 'status-rnd';
+            if (p.status === 'Selesai') statusClass = 'status-selesai';
+            else if (p.status === 'Gagal') statusClass = 'status-gagal';
+            else if (p.status === 'Menunggu') statusClass = 'status-menunggu';
+            else if (p.status === 'Pengerjaan RnD') statusClass = 'status-rnd';
+            else if (p.status === 'Pengerjaan Registrasi') statusClass = 'status-registrasi';
 
             const cleanDate = p.date ? (p.date.includes('T') ? p.date.split('T')[0] : p.date) : '-';
+
+            let highlightRnD = false;
+            let highlightReg = false;
+
+            if (p.status !== 'Gagal') {
+                if (p.rnd !== 'Menunggu' && p.rnd !== 'Selesai') {
+                    highlightRnD = true;
+                } else if (p.rnd === 'Selesai') {
+                    if (p.reg !== 'Menunggu') {
+                        highlightReg = true;
+                    } else {
+                        highlightRnD = true;
+                    }
+                }
+            }
+
+            const rndHtml = highlightRnD 
+                ? `<div style="border-left: 3px solid #3b82f6; padding-left: 8px; font-weight: 600; color: #1d4ed8;">${p.rnd}</div>`
+                : `<div style="padding-left: 11px; color: var(--color-text-light);">${p.rnd}</div>`;
+                
+            const regHtml = highlightReg 
+                ? `<div style="border-left: 3px solid #8b5cf6; padding-left: 8px; font-weight: 600; color: #7c3aed;">${p.reg}</div>`
+                : `<div style="padding-left: 11px; color: var(--color-text-light);">${p.reg}</div>`;
 
             // Tombol Aksi Sesuai Peran
             let uploadBriefBtnHtml = '';
@@ -147,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (p.rnd === 'Selesai' && !p.productBrief && p.status !== 'Gagal') {
                     uploadBriefBtnHtml = `
                         <button class="icon-btn btn-edit" style="background-color: #f3e8ff; color: #9333ea;" title="Upload Product Brief" onclick="window.triggerBriefUpload(${p.id})">
-                            <i class="fas fa-upload"></i>
+                             <i class="fas fa-upload"></i>
                         </button>
                     `;
                 }
@@ -175,8 +208,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (window.loggedInRole === 'RnD' || window.loggedInRole === 'Registrasi') {
                 if (p.status !== 'Gagal') {
-                    if (window.loggedInRole === 'RnD' && p.productBrief) {
-                        // Terkunci Jika Brief Terunggah
+                    if (p.rnd === 'Selesai' && p.reg === 'Selesai') {
+                        // Keduanya selesai, tampilkan ikon centang
+                        editBtnHtml = `
+                            <span style="color: #10b981; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;" title="Kedua Fase Selesai">
+                                <i class="fas fa-check-circle"></i>
+                            </span>
+                        `;
+                    } else if (window.loggedInRole === 'RnD' && p.rnd === 'Selesai') {
+                        // RnD selesai, RnD tidak bisa edit lagi (centang hijau)
+                        editBtnHtml = `
+                            <button class="icon-btn" style="color: #10b981; background-color: #ecfdf5; cursor: not-allowed;" title="Fase RnD sudah selesai" disabled>
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        `;
+                    } else if (window.loggedInRole === 'Registrasi' && p.reg === 'Selesai') {
+                        // Registrasi selesai, Registrasi tidak bisa edit lagi (centang hijau)
+                        editBtnHtml = `
+                            <button class="icon-btn" style="color: #10b981; background-color: #ecfdf5; cursor: not-allowed;" title="Fase Registrasi sudah selesai" disabled>
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        `;
+                    } else if (window.loggedInRole === 'Registrasi' && p.rnd !== 'Selesai') {
+                        // Terkunci jika RnD belum Selesai
+                        editBtnHtml = `
+                            <button class="icon-btn" style="color: #94a3b8; background-color: #f1f5f9; cursor: not-allowed;" title="Fase RnD belum selesai" disabled>
+                                <i class="fas fa-lock"></i>
+                            </button>
+                        `;
                     } else {
                         editBtnHtml = `
                             <button class="icon-btn btn-edit" title="Update Status" onclick="window.openModal(${p.id})">
@@ -188,15 +247,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const tr = document.createElement('tr');
+            tr.id = `product-row-${p.id}`;
             tr.innerHTML = `
                 <td>${(index + 1).toString().padStart(2, '0')}</td>
-                <td>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(p.client)}&background=random&rounded=true&size=32" alt="avatar">
-                        ${p.client}
-                    </div>
-                </td>
-                <td>${cleanDate}</td>
+                <td>${p.client}</td>
+                <td style="white-space: nowrap;">${cleanDate}</td>
                 <td>${p.product}</td>
                 <td>
                     ${p.document 
@@ -207,13 +262,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         : ''}
                 </td>
                 <td>
-                    <div class="status-indicator">
-                        ${dotHtml}
+                    <div class="status-indicator ${statusClass}">
+                        <span class="dot"></span>
                         ${p.status}
                     </div>
                 </td>
-                <td>${p.rnd}</td>
-                <td>${p.reg}</td>
+                <td>${rndHtml}</td>
+                <td>${regHtml}</td>
+                <td>${formatDateTime(p.lastUpdated)}</td>
                 <td>
                     <div class="action-group" style="display: flex; gap: 8px; align-items: center;">
                         ${uploadBriefBtnHtml}
@@ -229,6 +285,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render Awal Tabel Produk
     await renderTable();
+
+    // Jalankan highlight jika parameter 'highlight' ditemukan di URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightId = urlParams.get('highlight');
+    if (highlightId) {
+        const targetRow = document.getElementById(`product-row-${highlightId}`);
+        if (targetRow) {
+            // Gulir secara halus ke baris data tersebut
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Beri sorotan warna latar kuning lembut secara sementara
+            targetRow.style.backgroundColor = '#fef08a';
+            targetRow.style.transition = 'background-color 0.5s';
+            
+            // Hilangkan sorotan secara perlahan setelah 3 detik
+            setTimeout(() => {
+                targetRow.style.backgroundColor = '';
+            }, 3000);
+        }
+    }
 
     // Tangani Modal Update Status
     const updateModal = document.getElementById('updateModal');
@@ -258,6 +334,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const id = parseInt(document.getElementById('updateId').value);
             const rndStatusVal = document.getElementById('rndStatus').value;
             const regStatusVal = document.getElementById('regStatus').value;
+
+            // Verifikasi tambahan sebelum menyelesaikan fase
+            const products = await window.db.getProducts();
+            const p = products.find(x => x.id === id);
+            if (p) {
+                if (rndStatusVal === 'Selesai' && p.rnd !== 'Selesai') {
+                    if (!confirm('Apakah Anda yakin ingin menyelesaikan Fase RnD? Setelah diselesaikan, Anda tidak dapat mengubah status fase ini lagi.')) {
+                        return;
+                    }
+                }
+                if (regStatusVal === 'Selesai' && p.reg !== 'Selesai') {
+                    if (!confirm('Apakah Anda yakin ingin menyelesaikan Fase Registrasi? Setelah diselesaikan, Anda tidak dapat mengubah status fase ini lagi.')) {
+                        return;
+                    }
+                }
+            }
 
             await window.db.updateProduct(id, rndStatusVal, regStatusVal);
             await renderTable();
